@@ -1,0 +1,1 @@
+from vrep_env.envs.vrep_soccer_env import VrepSoccerEnv

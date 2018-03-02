@@ -20,6 +20,7 @@ from kfac import KFACOptimizer
 from model import CNNPolicy, MLPPolicy
 from storage import RolloutStorage
 from visualize import visdom_plot
+import vrep_env
 
 args = get_args()
 
@@ -128,6 +129,9 @@ def main():
             episode_rewards += reward
 
             # If done then clean the history of observations.
+            if ((j+1)%500==0):
+                done = [True for _done in done]
+                envs.reset()
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
             final_rewards *= masks
             final_rewards += (1 - masks) * episode_rewards
@@ -246,9 +250,10 @@ def main():
         if j % args.log_interval == 0:
             end = time.time()
             total_num_steps = (j + 1) * args.num_processes * args.num_steps
-            print("Updates {}, num timesteps {}, FPS {}, mean/median reward {:.1f}/{:.1f}, min/max reward {:.1f}/{:.1f}, entropy {:.5f}, value loss {:.5f}, policy loss {:.5f}".
+            print("Updates {}, num timesteps {}, FPS {}, episode_rewards {:.5f},mean/median reward {:.1f}/{:.1f}, min/max reward {:.1f}/{:.1f}, entropy {:.5f}, value loss {:.5f}, policy loss {:.5f}".
                 format(j, total_num_steps,
                        int(total_num_steps / (end - start)),
+                       episode_rewards.mean(),
                        final_rewards.mean(),
                        final_rewards.median(),
                        final_rewards.min(),
