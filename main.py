@@ -21,6 +21,7 @@ from model import CNNPolicy, MLPPolicy
 from storage import RolloutStorage
 from visualize import visdom_plot
 import vrep_env
+from time import localtime, strftime
 
 args = get_args()
 
@@ -245,7 +246,7 @@ def main():
             save_model = [save_model,
                             hasattr(envs, 'ob_rms') and envs.ob_rms or None]
 
-            torch.save(save_model, os.path.join(save_path, args.env_name + ".pt"))
+            torch.save(save_model, os.path.join(save_path, args.env_name + strftime("-Dia%d-%H:%M:%S", localtime()) + ".pt"))
 
         if j % args.log_interval == 0:
             end = time.time()

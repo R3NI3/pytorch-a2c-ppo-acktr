@@ -39,6 +39,9 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
                 time_step, # specify a simulation time step
                 vrep.simx_opmode_oneshot)
 
+        vrep.simxStartSimulation(self.clientID, vrep.simx_opmode_blocking)
+        time.sleep(.05)
+
         self.get_handles(actuator_names, robot_names, object_names)
 
         self.time_step = time_step
