@@ -47,9 +47,9 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
         self.time_step = time_step
         #todo check if observation_space and action_space are correct
         shape = len(robot_names)*5 + len(object_names)*4
-        self.observation_space = spaces.Box(low=0, high=1700, shape=[shape])
+        self.observation_space = spaces.Box(low=-100, high=100, dtype=np.float32, shape=(shape,))
         shape = len(robot_names)*2
-        self.action_space = spaces.Box(low=-10, high=10, shape=[shape])
+        self.action_space = spaces.Box(low=-1, high=1, dtype=np.float32, shape=(shape,))
 
         self.getSimulationState()
 
@@ -251,8 +251,7 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
             self.state[name] = [x, y, np.arctan2(lin_vel[0],lin_vel[1]) ,np.linalg.norm(lin_vel[0:2])]
             ret_list += self.state[name]
 
-
-        return ret_list
+        return np.transpose(np.array(ret_list))
 
     def get_handles(self, actuator_names, robot_names, object_names):
         # get the handles for each motor and set up streaming
