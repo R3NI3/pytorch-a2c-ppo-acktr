@@ -129,10 +129,6 @@ def main():
             reward = torch.from_numpy(np.expand_dims(np.stack(reward), 1)).float()
             episode_rewards += reward
 
-            # If done then clean the history of observations.
-            if ((j+1)%500==0):
-                done = [True for _done in done]
-                envs.reset()
             masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
             final_rewards *= masks
             final_rewards += (1 - masks) * episode_rewards
@@ -149,6 +145,10 @@ def main():
             update_current_obs(obs)
             rollouts.insert(step, current_obs, states.data, action.data, action_log_prob.data, value.data, reward, masks)
 
+        # If done then clean the history of observations.
+        #if ((j+1)%10==0):
+        #    done = [True for _done in done]
+        #    envs.reset()
         next_value = actor_critic(Variable(rollouts.observations[-1], volatile=True),
                                   Variable(rollouts.states[-1], volatile=True),
                                   Variable(rollouts.masks[-1], volatile=True))[0].data

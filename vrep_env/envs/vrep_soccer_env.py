@@ -6,7 +6,7 @@ from gym.utils import seeding
 
 import vrep
 import os
-import time
+import time, random
 import numpy as np
 from operator import sub
 
@@ -18,7 +18,8 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
         port = 19997
         time_step = 0.01
         actuator_names = ['LeftMotor', 'RightMotor']
-        object_names = ['Bola', 'Dummy']
+        object_names = ['Bola']
+        dummy_names = ['linha_fundo_baixo', 'linha_fundo2_alto']
         robot_names = ['DifferentialDriveRobot']
         scene_path = './Cenario.ttt'
          # Connect to the V-REP continuous server
@@ -42,7 +43,7 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
         vrep.simxStartSimulation(self.clientID, vrep.simx_opmode_blocking)
         time.sleep(.05)
 
-        self.get_handles(actuator_names, robot_names, object_names)
+        self.get_handles(actuator_names, robot_names, object_names, dummy_names)
 
         self.time_step = time_step
         #todo check if observation_space and action_space are correct
@@ -87,24 +88,20 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
 
     def check_done(self):
         angles = self.get_orientation('DifferentialDriveRobot')
-        bola_pos = self.get_position('Bola')
         angles_diff = list(map(sub, angles, self.init_orientation))
-        if (abs(angles_diff[0]) > 20 or abs(angles_diff[1]) > 20):
-            print("*******DONE1*****")
-            self.reset()
+        if (abs(angles_diff[0]) >10 or abs(angles_diff[1]) > 10):
+            print("*******Robo virou*****")
             return True
 
-        if (abs(bola_pos[2]) > 10):
-            print("*******DONE2*****")
-            self.reset()
+        ball_pos = np.array(self.get_position('Bola'))
+        if (abs(ball_pos[2]) > 10):
+            print("*******Bola caiu no Limbo*****")
             return True
 
-        dummy_pos = np.array(self.state['Dummy'][0:2])
-        target_pos = np.array(self.state['Bola'][0:2])
-        distance = np.linalg.norm(dummy_pos - target_pos)
-        if (distance < 0.2):
-            print("******Done3******")
-            self.reset()
+        ball_pos = ball_pos[0:2]
+        robot_pos = np.array(self.state['DifferentialDriveRobot'][0:2])
+        if (np.linalg.norm(robot_pos - ball_pos) < 0.1):
+            print("*******Objetivo Alcancado*****")
             return True
 
         return False
@@ -114,15 +111,16 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
             l = 1 if action[0] > 0 else -1
         else:
             l = action[0]
+
+        if (abs(action[1]) > 1):
+            omega = 1 if action[1] > 0 else -1
+        else:
+            omega = action[0]
         l = l/10
-        omega = action[1]
         HALF_AXIS = 0.0325
         WHEEL_R = 0.032/2
         motorSpeed = [0,0]
-        #angularFreqL = l - HALF_AXIS * omega;
-        #angularFreqR = l + HALF_AXIS * omega;
-        #motorSpeedL = (angularFreqL / WHEEL_R);
-        #motorSpeedR = (angularFreqR / WHEEL_R);
+        #transfer input to motor velocities
         angularFreqL = l - HALF_AXIS * omega;
         angularFreqR = l + HALF_AXIS * omega;
         motorSpeed[0] = (angularFreqL / WHEEL_R);
@@ -136,30 +134,49 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
         vrep.simxSynchronousTrigger(self.clientID)
 
     def get_reward(self):
-        state_info = self.state
+        robot_pos = np.array(self.state['DifferentialDriveRobot'][0:2])
+        target_pos = np.array(self.state['Bola'][0:2])
+        time1_fundo_pos = np.array(self.state['linha_fundo_baixo'])
+        time2_fundo_pos = np.array(self.state['linha_fundo2_alto'])
 
-        robot_pos = np.array(state_info['DifferentialDriveRobot'][0:2])
-        target_pos = np.array(state_info['Bola'][0:2])
-        dummy_pos = np.array(state_info['Dummy'][0:2])
-        distance = np.linalg.norm(dummy_pos - target_pos)
-        distance2 = np.linalg.norm(robot_pos - target_pos)
-        if (distance < 0.2):
-            reward = 100000
-        else:
-            reward = -1 + (self.old_distance - distance)*10 - distance2
-            #reward = -2 if distance > self.old_distance else 1
-            #reward = 0
-        #reward = (self.old_distance - distance)*100 if distance < self.old_distance else -1
-        self.old_distance = distance
-        #reward -= distance*10#1/ distance if distance != 0 else 1000
+        #check gol "a favor" (lado negativo do campo)
+        #if (target_pos[0] < time2_fundo_pos[0])
+
+        #check got "contra" (lado positivo do campo)
+        #if (target_pos[0] > time2_fundo_pos[0])
+
+        #reward to robot to follow ball position
+        reward = 1/np.linalg.norm(robot_pos - target_pos)
+
         return reward
 
     def reset(self):
         vrep.simxStopSimulation(self.clientID, vrep.simx_opmode_blocking)
         time.sleep(.05)
+
+        time1_fundo_pos = np.array(self.state['linha_fundo_baixo'])
+        time2_fundo_pos = np.array(self.state['linha_fundo2_alto'])
+
+        for ddr_name, ddr_handle in self.ddr_handles.items():
+            new_x = random.uniform(time2_fundo_pos[0] + 0.2, time1_fundo_pos[0] - 0.2)
+            new_y = random.uniform(time2_fundo_pos[1] + 0.2, time1_fundo_pos[1] - 0.2)
+            vrep.simxSetObjectPosition(self.clientID, ddr_handle, -1, 
+                                        [new_x, new_y, self.get_position(ddr_name)[2]], #new position
+                                        vrep.simx_opmode_blocking)
+
+        for obj_name, obj_handle in self.obj_handles.items():
+            new_x = random.uniform(time2_fundo_pos[0] + 0.2, time1_fundo_pos[0] - 0.2)
+            new_y = random.uniform(time2_fundo_pos[1] + 0.2, time1_fundo_pos[1] - 0.2)
+            vrep.simxSetObjectPosition(self.clientID, obj_handle, -1, 
+                                        [new_x, new_y, self.get_position(obj_name)[2]], #new position
+                                        vrep.simx_opmode_blocking)
+
         vrep.simxStartSimulation(self.clientID, vrep.simx_opmode_blocking)
         time.sleep(.05)
         self._turn_display(False)
+
+        print("RESET")
+
         return self.getSimulationState()
 
     def render(self):
@@ -185,6 +202,8 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
             obj_handle = self.obj_handles[obj_name]
         elif obj_name in self.act_handles:
             obj_handle = self.act_handles[obj_name]
+        elif obj_name in self.dummy_handles:
+            obj_handle = self.dummy_handles[obj_name]
         else:
             return -1
 
@@ -251,9 +270,13 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
             self.state[name] = [x, y, np.arctan2(lin_vel[0],lin_vel[1]) ,np.linalg.norm(lin_vel[0:2])]
             ret_list += self.state[name]
 
+        for name, handle in self.dummy_handles.items():
+            x, y = self.get_position(name)[0:2]
+            self.state[name] = [x, y] 
+
         return np.transpose(np.array(ret_list))
 
-    def get_handles(self, actuator_names, robot_names, object_names):
+    def get_handles(self, actuator_names, robot_names, object_names, dummy_names):
         # get the handles for each motor and set up streaming
         self.act_handles = {}
         for name in actuator_names:
@@ -277,6 +300,13 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
                     name, vrep.simx_opmode_blocking)
             if _ !=0 : raise Exception()
             self.ddr_handles.update({name:obj_handle})
+        # get dummy handles
+        self.dummy_handles = {}
+        for name in dummy_names:
+            _, obj_handle = vrep.simxGetObjectHandle(self.clientID,
+                    name, vrep.simx_opmode_blocking)
+            if _ !=0 : raise Exception()
+            self.dummy_handles.update({name:obj_handle})
 
     def startSimulation(self):
         vrep.simxStartSimulation(self.clientID, vrep.simx_opmode_blocking)
