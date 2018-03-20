@@ -83,40 +83,54 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
     def step(self, action):
         self._take_action(action)
         state_info = self.getSimulationState()
-        done = self.check_done()
-        return state_info,self.get_reward(),done, {}
+        done, code = self.check_done()
+        if(done):
+            if(code != 4):
+                reward = -100
+            else:
+                reward = 100
+        else:
+            reward = self.get_reward()
+        return state_info, reward, done, {}
 
     def check_done(self):
-        angles = self.get_orientation('DifferentialDriveRobot')
-        angles_diff = list(map(sub, angles, self.init_orientation))
-        if (abs(angles_diff[0]) >10 or abs(angles_diff[1]) > 10):
-            print("*******Robo virou*****")
-            return True
+        
+        #robot conditions
+        rob_ang = self.get_orientation('DifferentialDriveRobot')
+        rob_pos = self.get_position('DifferentialDriveRobot')
+        if (abs(rob_ang[0]) > 1 or abs(rob_ang[1]) > 1):
+            print("*******Robot's upside down*****")
+            return True, 1
+
+        if (abs(rob_pos[2]) > 10 or abs(rob_pos[1]) > 0.7 or abs(rob_pos[0]) > 0.9):
+            print("*******Robot's out of the field*****")
+            return True, 2
 
         ball_pos = np.array(self.get_position('Bola'))
         if (abs(ball_pos[2]) > 10):
-            print("*******Bola caiu no Limbo*****")
-            return True
+            print("*******Bola is in the void*****")
+            return True, 3
 
         ball_pos = ball_pos[0:2]
-        robot_pos = np.array(self.state['DifferentialDriveRobot'][0:2])
+        robot_pos = rob_pos[0:2]
         if (np.linalg.norm(robot_pos - ball_pos) < 0.1):
-            print("*******Objetivo Alcancado*****")
-            return True
+            print("*******Objective Reached*****")
+            return True, 4
 
-        return False
+        return False, 0
 
     def _take_action(self, action):
-        if (abs(action[0]) > 1):
-            l = 1 if action[0] > 0 else -1
-        else:
-            l = action[0]
+        #if (abs(action[0]) > 1):
+        #    l = 1 if action[0] > 0 else -1
+        #else:
+        #    l = action[0]
 
-        if (abs(action[1]) > 1):
-            omega = 1 if action[1] > 0 else -1
-        else:
-            omega = action[0]
-        l = l/10
+        #if (abs(action[1]) > 1):
+        #    omega = 1 if action[1] > 0 else -1
+        #else:
+        #    omega = action[1]
+        l = 1*action[0]
+        omega = action[1]
         HALF_AXIS = 0.0325
         WHEEL_R = 0.032/2
         motorSpeed = [0,0]
@@ -139,14 +153,14 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
         time1_fundo_pos = np.array(self.state['linha_fundo_baixo'])
         time2_fundo_pos = np.array(self.state['linha_fundo2_alto'])
 
-        #check gol "a favor" (lado negativo do campo)
+        #check goal "a favor" (lado negativo do campo)
         #if (target_pos[0] < time2_fundo_pos[0])
 
-        #check got "contra" (lado positivo do campo)
+        #check goal "contra" (lado positivo do campo)
         #if (target_pos[0] > time2_fundo_pos[0])
 
         #reward to robot to follow ball position
-        reward = 1/np.linalg.norm(robot_pos - target_pos)
+        reward = -5*np.tanh(np.linalg.norm(robot_pos - target_pos))
 
         return reward
 

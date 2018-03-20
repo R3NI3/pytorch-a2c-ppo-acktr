@@ -49,6 +49,8 @@ def main():
     print("WARNING: All rewards are clipped or normalized so you need to use a monitor (see envs.py) or visdom plot to get true rewards")
     print("#######")
 
+    act_date = strftime("-Dia%d-%H:%M:%S", localtime())
+
     os.environ['OMP_NUM_THREADS'] = '1'
 
     if args.vis:
@@ -121,7 +123,8 @@ def main():
             # Sample actions
             value, action, action_log_prob, states = actor_critic.act(Variable(rollouts.observations[step], volatile=True),
                                                                       Variable(rollouts.states[step], volatile=True),
-                                                                      Variable(rollouts.masks[step], volatile=True))
+                                                                      Variable(rollouts.masks[step], volatile=True),
+                                                                      deterministic = False)
             cpu_actions = action.data.squeeze(1).cpu().numpy()
 
             # Obser reward and next obs
@@ -146,7 +149,7 @@ def main():
             rollouts.insert(step, current_obs, states.data, action.data, action_log_prob.data, value.data, reward, masks)
 
         # If done then clean the history of observations.
-        #if ((j+1)%10==0):
+        #if (((j*args.num_steps)+1)%5000==0):
         #    done = [True for _done in done]
         #    envs.reset()
         next_value = actor_critic(Variable(rollouts.observations[-1], volatile=True),
@@ -246,7 +249,7 @@ def main():
             save_model = [save_model,
                             hasattr(envs, 'ob_rms') and envs.ob_rms or None]
 
-            torch.save(save_model, os.path.join(save_path, args.env_name + strftime("-Dia%d-%H:%M:%S", localtime()) + ".pt"))
+            torch.save(save_model, os.path.join(save_path, args.env_name + act_date + ".pt"))
 
         if j % args.log_interval == 0:
             end = time.time()

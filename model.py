@@ -127,18 +127,19 @@ class MLPPolicy(FFPolicy):
         self.action_space = action_space
 
         self.a_fc1 = nn.Linear(num_inputs, 64)
-        self.a_fc2 = nn.Linear(64, 64)
+        self.a_fc2 = nn.Linear(64, 128)
+        self.a_fc3 = nn.Linear(128, 256)
 
-        self.v_fc1 = nn.Linear(num_inputs, 64)
-        self.v_fc2 = nn.Linear(64, 64)
-        self.v_fc3 = nn.Linear(64, 1)
+        self.v_fc1 = nn.Linear(num_inputs, 128)
+        self.v_fc2 = nn.Linear(128, 128)
+        self.v_fc3 = nn.Linear(128, 1)
 
         if action_space.__class__.__name__ == "Discrete":
             num_outputs = action_space.n
-            self.dist = Categorical(64, num_outputs)
+            self.dist = Categorical(256, num_outputs)
         elif action_space.__class__.__name__ == "Box":
             num_outputs = action_space.shape[0]
-            self.dist = DiagGaussian(64, num_outputs)
+            self.dist = DiagGaussian(256, num_outputs)
         else:
             raise NotImplementedError
 
@@ -177,6 +178,9 @@ class MLPPolicy(FFPolicy):
         x = F.tanh(x)
 
         x = self.a_fc2(x)
+        x = F.tanh(x)
+
+        x = self.a_fc3(x)
         x = F.tanh(x)
 
         return value, x, states
