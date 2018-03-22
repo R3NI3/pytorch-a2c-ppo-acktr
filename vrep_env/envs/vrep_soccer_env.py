@@ -86,7 +86,7 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
         done, code = self.check_done()
         if(done):
             if(code != 4):
-                reward = -100
+                reward = np.NINF
             else:
                 reward = 100
         else:
@@ -113,7 +113,7 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
 
         ball_pos = ball_pos[0:2]
         robot_pos = rob_pos[0:2]
-        if (np.linalg.norm(robot_pos - ball_pos) < 0.1):
+        if (np.linalg.norm(robot_pos - ball_pos) < 0.15):
             print("*******Objective Reached*****")
             return True, 4
 
@@ -129,7 +129,7 @@ class VrepSoccerEnv(gym.Env, utils.EzPickle):
         #    omega = 1 if action[1] > 0 else -1
         #else:
         #    omega = action[1]
-        l = 1*action[0]
+        l = 0.2*action[0]
         omega = action[1]
         HALF_AXIS = 0.0325
         WHEEL_R = 0.032/2

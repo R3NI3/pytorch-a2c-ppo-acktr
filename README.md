@@ -12,17 +12,6 @@ Also see the OpenAI posts: [A2C/ACKTR](https://blog.openai.com/baselines-acktr-a
 
 This implementation is inspired by the OpenAI baselines for [A2C](https://github.com/openai/baselines/tree/master/baselines/a2c), [ACKTR](https://github.com/openai/baselines/tree/master/baselines/acktr) and [PPO](https://github.com/openai/baselines/tree/master/baselines/ppo1). It uses the same hyper parameters and the model since they were well tuned for Atari games.
 
-Please use this bibtex if you want to cite this repository in your publications:
-
-    @misc{pytorchrl,
-      author = {Kostrikov, Ilya},
-      title = {PyTorch Implementations of Reinforcement Learning Algorithms},
-      year = {2018},
-      publisher = {GitHub},
-      journal = {GitHub repository},
-      howpublished = {\url{https://github.com/ikostrikov/pytorch-a2c-ppo-acktr}},
-    }
-
 ## Supported (and tested) environments (via [OpenAI Gym](https://gym.openai.com))
 * [Atari Learning Environment](https://github.com/mgbellemare/Arcade-Learning-Environment)
 * [MuJoCo](http://mujoco.org)
@@ -35,6 +24,7 @@ All environments are operated using exactly the same Gym interface. See their do
 ## Requirements
 
 * Python 3 (it might work with Python 2, but I didn't test it)
+* [Vrep](http://www.coppeliarobotics.com/)
 * [PyTorch](http://pytorch.org/)
 * [Visdom](https://github.com/facebookresearch/visdom)
 * [OpenAI baselines](https://github.com/openai/baselines)
@@ -54,6 +44,56 @@ pip install -e .
 pip install -r requirements.txt
 ```
 
+## Installing Walkthrough
+
+Download vrep
+```
+	http://www.coppeliarobotics.com/downloads.html
+```
+Download and Install Conda
+```
+	https://www.anaconda.com/download/#linux
+	i - bash Anaconda3-5.0.1-Linux-x86_64.sh
+	ii - Add Anaconda to Enviroment PATH
+	iii - source ~/.bashrc
+```
+Install pytorch
+```
+	conda install pytorch-cpu torchvision -c pytorch
+```
+Install Baselines
+```
+	i - git clone https://github.com/openai/baselines.git
+	ii - cd baselines
+	iii - pip install -e .
+		problems here:
+		a) Atari problems:   
+			sudo apt-get install zlib1g-dev
+			sudo apt install cmake
+		b) Mujoco problems:
+			mpi4py - sudo apt install libopenmpi-dev  
+		    Delete mujoco if you are not using it:
+			    edit ./baselines/setup.py
+					locate the line containing 'gym[mujoco,atari,classic_control,robotics]'
+					delete mujoco and robotics, resulting in 'gym[atari,classic_control]'
+					save setup.py
+			run pip install -e .
+```
+Install Work branch
+```
+	i  - git clone https://github.com/R3NI3/pytorch-a2c-ppo-acktr.git
+	ii - pip install -r requirements.txt
+	iii- git fetch --all
+	iv - switch to proper devel branch
+```
+Install Extra packages
+```
+	i - pip install opencv-python
+	ii- pip install visdom
+```
+
+Obs: if you need to run mujoco go back to Mujoco problems and install mujoco as explained in https://github.com/openai/mujoco-py
+
 ## Contributions
 
 Contributions are very welcome. If you know how to make this code better, please open an issue. If you want to submit a pull request, please open an issue first. Also see a todo list below.
@@ -72,6 +112,18 @@ It's extremely difficult to reproduce results for Reinforcement Learning methods
 ## Training
 
 Start a `Visdom` server with `python -m visdom.server`, it will serve `http://localhost:8097/` by default.
+Start Vrep if you're going to train with it
+
+### Vrep
+```
+Open Vrep server
+Switch to branch devel_vrepEnv_Renie_v0 
+```
+
+Run
+```bash
+python main.py --env-name "vrep_soccer-v0" --num-processes 1
+```
 
 ### Atari
 #### A2C
@@ -128,37 +180,3 @@ python enjoy.py --load-dir trained_models/a2c --env-name "PongNoFrameskip-v4" --
 ```bash
 python enjoy.py --load-dir trained_models/ppo --env-name "Reacher-v1" --num-stack 1
 ```
-
-## Results
-
-### A2C
-
-![BreakoutNoFrameskip-v4](imgs/a2c_breakout.png)
-
-![SeaquestNoFrameskip-v4](imgs/a2c_seaquest.png)
-
-![QbertNoFrameskip-v4](imgs/a2c_qbert.png)
-
-![beamriderNoFrameskip-v4](imgs/a2c_beamrider.png)
-
-### PPO
-
-
-![BreakoutNoFrameskip-v4](imgs/ppo_halfcheetah.png)
-
-![SeaquestNoFrameskip-v4](imgs/ppo_hopper.png)
-
-![QbertNoFrameskip-v4](imgs/ppo_reacher.png)
-
-![beamriderNoFrameskip-v4](imgs/ppo_walker.png)
-
-
-### ACKTR
-
-![BreakoutNoFrameskip-v4](imgs/acktr_breakout.png)
-
-![SeaquestNoFrameskip-v4](imgs/acktr_seaquest.png)
-
-![QbertNoFrameskip-v4](imgs/acktr_qbert.png)
-
-![beamriderNoFrameskip-v4](imgs/acktr_beamrider.png)
