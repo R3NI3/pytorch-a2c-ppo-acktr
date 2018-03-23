@@ -7,6 +7,7 @@ import torch
 from torch.autograd import Variable
 from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
 from baselines.common.vec_env.vec_normalize import VecNormalize
+from model import CNNPolicy, MLPPolicy
 
 from envs import make_env
 
@@ -22,17 +23,31 @@ parser.add_argument('--log-interval', type=int, default=10,
                     help='log interval, one log per n updates (default: 10)')
 parser.add_argument('--env-name', default='PongNoFrameskip-v4',
                     help='environment to train on (default: PongNoFrameskip-v4)')
-parser.add_argument('--load-dir', default='./trained_models/',
-                    help='directory to save agent logs (default: ./trained_models/)')
+parser.add_argument('--load-file', default=None,
+                    help='directory to save agent logs (default: None)')
 args = parser.parse_args()
 
 
 env = make_env(args.env_name, args.seed, 0, None)
 env = DummyVecEnv([env])
 
-actor_critic, ob_rms = \
-            torch.load(os.path.join(args.load_dir, args.env_name + ".pt"))
+obs_shape = env.observation_space.shape
+obs_shape = (obs_shape[0] * args.num_stack, *obs_shape[1:])
 
+if len(env.observation_space.shape) == 3:
+        actor_critic = CNNPolicy(obs_shape[0], env.action_space, args.recurrent_policy)
+else:
+    actor_critic = MLPPolicy(obs_shape[0], env.action_space)
+
+if (args.load_file):
+    if os.path.isfile(args.load_file):
+        print("=> loading checkpoint '{}'".format(args.load_file))
+        checkpoint = torch.load(args.load_file)
+        updates = checkpoint['epoch']
+        actor_critic.load_state_dict(checkpoint['state_dict'])
+        ob_rms = checkpoint['ob_rms']
+else:
+    exit()
 
 if len(env.observation_space.shape) == 1:
     env = VecNormalize(env, ret=False)

@@ -79,6 +79,34 @@ def main():
             "Recurrent policy is not implemented for the MLP controller"
         actor_critic = MLPPolicy(obs_shape[0], envs.action_space)
 
+    if args.resume:
+        if os.path.isfile(args.resume):
+            print("=> loading checkpoint '{}'".format(args.resume))
+            checkpoint = torch.load(args.resume)
+            updates = checkpoint['epoch']
+            args.algo = checkpoint['algorithm']
+            actor_critic.load_state_dict(checkpoint['state_dict'])
+
+            if args.algo == 'a2c':
+                optimizer = optim.RMSprop(actor_critic.parameters(), args.lr, eps=args.eps, alpha=args.alpha)
+            elif args.algo == 'ppo':
+                optimizer = optim.Adam(actor_critic.parameters(), args.lr, eps=args.eps)
+            elif args.algo == 'acktr':
+                optimizer = KFACOptimizer(actor_critic)
+
+            optimizer.load_state_dict(checkpoint['optimizer'])
+        else:
+            print("=> no checkpoint found at '{}'".format(args.resume))
+            exit()
+    else:
+        updates = 0
+        if args.algo == 'a2c':
+            optimizer = optim.RMSprop(actor_critic.parameters(), args.lr, eps=args.eps, alpha=args.alpha)
+        elif args.algo == 'ppo':
+            optimizer = optim.Adam(actor_critic.parameters(), args.lr, eps=args.eps)
+        elif args.algo == 'acktr':
+            optimizer = KFACOptimizer(actor_critic)
+
     if envs.action_space.__class__.__name__ == "Discrete":
         action_shape = 1
     else:
@@ -86,13 +114,6 @@ def main():
 
     if args.cuda:
         actor_critic.cuda()
-
-    if args.algo == 'a2c':
-        optimizer = optim.RMSprop(actor_critic.parameters(), args.lr, eps=args.eps, alpha=args.alpha)
-    elif args.algo == 'ppo':
-        optimizer = optim.Adam(actor_critic.parameters(), args.lr, eps=args.eps)
-    elif args.algo == 'acktr':
-        optimizer = KFACOptimizer(actor_critic)
 
     rollouts = RolloutStorage(args.num_steps, args.num_processes, obs_shape, envs.action_space, actor_critic.state_size)
     current_obs = torch.zeros(args.num_processes, *obs_shape)
@@ -118,7 +139,8 @@ def main():
         rollouts.cuda()
 
     start = time.time()
-    for j in range(num_updates):
+    j = updates
+    while (j < num_updates):
         for step in range(args.num_steps):
             # Sample actions
             value, action, action_log_prob, states = actor_critic.act(Variable(rollouts.observations[step], volatile=True),
@@ -241,15 +263,15 @@ def main():
             except OSError:
                 pass
 
-            # A really ugly way to save a model to CPU
-            save_model = actor_critic
-            if args.cuda:
-                save_model = copy.deepcopy(actor_critic).cpu()
+            state = {
+            'epoch': j,
+            'state_dict': actor_critic.state_dict(),
+            'optimizer' : optimizer.state_dict(),
+            'algorithm' : args.algo,
+            "ob_rms" : hasattr(envs, 'ob_rms') and envs.ob_rms or None
+            }
 
-            save_model = [save_model,
-                            hasattr(envs, 'ob_rms') and envs.ob_rms or None]
-
-            torch.save(save_model, os.path.join(save_path, args.env_name + act_date + ".pt"))
+            torch.save(state, os.path.join(save_path, args.env_name + act_date + ".pt"))
 
         if j % args.log_interval == 0:
             end = time.time()
@@ -269,6 +291,7 @@ def main():
                 win = visdom_plot(viz, win, args.log_dir, args.env_name, args.algo)
             except IOError:
                 pass
+        j += 1
 
 if __name__ == "__main__":
     main()
